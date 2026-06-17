@@ -1,0 +1,22 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local app runtime data
+StudyApp-main/StudyApp-main/CertApp/data/
+StudyApp-main/StudyApp-main/CertApp/asked_questions.json
+StudyApp-main/StudyApp-main/CertApp/wrong_questions.json
+StudyApp-main/StudyApp-main/CertApp/score_history.json
+
+# Local/editor files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

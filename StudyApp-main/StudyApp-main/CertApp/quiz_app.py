@@ -33,42 +33,67 @@ def load_questions(file_path):
         return json.load(f)
 
 # --- Persistent Memory for Asked Questions ---
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(APP_DIR, "data")
+
+
+def runtime_data_file(filename):
+    return os.path.join(DATA_DIR, filename)
+
+
+def legacy_runtime_file(filename):
+    return os.path.join(APP_DIR, filename)
+
+
+def read_runtime_json(filename):
+    data_path = runtime_data_file(filename)
+    legacy_path = legacy_runtime_file(filename)
+    path = data_path if os.path.exists(data_path) else legacy_path
+
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def write_runtime_json(filename, data):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(runtime_data_file(filename), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def remove_runtime_json(filename):
+    for path in (runtime_data_file(filename), legacy_runtime_file(filename)):
+        if os.path.exists(path):
+            os.remove(path)
+
+
 QUESTION_MEMORY_FILE = "asked_questions.json"
 WRONG_QUESTIONS_FILE = "wrong_questions.json"
 
 
 def load_asked_questions():
-    if os.path.exists(QUESTION_MEMORY_FILE):
-        with open(QUESTION_MEMORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    return read_runtime_json(QUESTION_MEMORY_FILE)
 
 
 def save_asked_questions(questions):
-    with open(QUESTION_MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(questions, f, ensure_ascii=False, indent=2)
+    write_runtime_json(QUESTION_MEMORY_FILE, questions)
 
 
 def reset_question_memory():
-    if os.path.exists(QUESTION_MEMORY_FILE):
-        os.remove(QUESTION_MEMORY_FILE)
+    remove_runtime_json(QUESTION_MEMORY_FILE)
 
 
 def load_wrong_questions():
-    if os.path.exists(WRONG_QUESTIONS_FILE):
-        with open(WRONG_QUESTIONS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    return read_runtime_json(WRONG_QUESTIONS_FILE)
 
 
 def save_wrong_questions(questions):
-    with open(WRONG_QUESTIONS_FILE, "w", encoding="utf-8") as f:
-        json.dump(questions, f, ensure_ascii=False, indent=2)
+    write_runtime_json(WRONG_QUESTIONS_FILE, questions)
 
 
 def reset_wrong_questions():
-    if os.path.exists(WRONG_QUESTIONS_FILE):
-        os.remove(WRONG_QUESTIONS_FILE)
+    remove_runtime_json(WRONG_QUESTIONS_FILE)
 
 # --- Global Quiz State ---
 questions_asked = []
@@ -82,15 +107,11 @@ SCORE_HISTORY_FILE = "score_history.json"
 
 
 def load_score_history():
-    if os.path.exists(SCORE_HISTORY_FILE):
-        with open(SCORE_HISTORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    return read_runtime_json(SCORE_HISTORY_FILE)
 
 
 def save_score_history(history):
-    with open(SCORE_HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
+    write_runtime_json(SCORE_HISTORY_FILE, history)
 
 
 def record_score(score, correct, total):

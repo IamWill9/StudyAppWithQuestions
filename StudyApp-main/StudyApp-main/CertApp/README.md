@@ -20,11 +20,25 @@ A Tkinter-based quiz app to practice for **Microsoft SC‑200** (Security Operat
 
 ## Requirements
 
-Install Python 3.9+ and dependencies:
+Install Python 3.9+ and create a virtual environment:
 
 ```bash
+python -m venv .venv
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
+# macOS/Linux
+source .venv/bin/activate
+
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+```
+
+For development and tests, install the dev requirements instead:
+
+```bash
+python -m pip install -r requirements-dev.txt
 ```
 
 > On Linux you may also need system Tk bindings:
@@ -39,7 +53,7 @@ pip install -r requirements.txt
 
 ```bash
 # Validate your questions JSON
-python main.py --validate --file sc-200.json
+python main.py --validate --file questions/sc-200.json
 
 # Run the app (auto-detects JSON if not passed)
 python main.py --count 10 --dark
@@ -110,13 +124,17 @@ python3 main.py --count 10
 .
 ├─ main.py                 # CLI: runs GUI, validates JSON
 ├─ quiz_app.py             # Tkinter app & parsing helpers
-├─ sc-200.json             # test question bank
+├─ requirements.txt        # runtime dependencies
+├─ requirements-dev.txt    # test/development dependencies
+├─ questions/
+│  └─ sc-200.json          # test question bank
 ├─ Images/
 │  ├─ meow.jpg             # pass image (score ≥ 79%)
 │  └─ tryharder.jpg        # fail image
-├─ asked_questions.json    # generated at runtime
-├─ wrong_questions.json    # generated at runtime
-├─ score_history.json      # generated at runtime
+├─ data/                   # generated runtime memory/history; ignored by git
+│  ├─ asked_questions.json
+│  ├─ wrong_questions.json
+│  └─ score_history.json
 └─ tests/
    └─ test_quiz_app.py     # pytest: normalization & DnD checks
 ```
@@ -138,7 +156,8 @@ python main.py [--file PATH] [--count N] [--dark] [--validate]
 
 ## Development
 
-- Run tests: `pytest -q`
+- Install dev dependencies: `python -m pip install -r requirements-dev.txt`
+- Run tests: `python -m pytest -q`
 - Style: PEP 8; small, testable helpers.
 
 ---
