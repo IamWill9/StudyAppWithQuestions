@@ -214,15 +214,17 @@ def normalize_mc_answer_to_letters(options: List[str], answer: Iterable) -> Set[
         if not s:
             continue
 
-        # Case 1: starts with a letter (A/B/...) possibly followed by '.' or ':'
-        first = s[0].upper()
-        if first in letter_to_index:
-            letters.add(first)
-            continue
-
-        # Case 2: exact option text matches
+        # Case 1: exact option text matches.
+        # This must run before letter parsing so option text like "Disable Y"
+        # is not mistaken for answer letter D.
         if s in option_to_letter:
             letters.add(option_to_letter[s])
+            continue
+
+        # Case 2: a bare letter, or a letter followed by punctuation.
+        first = s[0].upper()
+        if first in letter_to_index and (len(s) == 1 or s[1] in ".:"):
+            letters.add(first)
             continue
 
         # Case 3: token like "A:" or "A." separated by whitespace
