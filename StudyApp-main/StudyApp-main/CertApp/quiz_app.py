@@ -342,7 +342,7 @@ def ask_multiple_choice(question_data, question_number):
         show_result(win, result)
 
     tk.Button(frame, text="Submit", command=submit).pack(pady=10)
-    tk.Button(frame, text="End Quiz", command=end_quiz).pack(pady=5)
+    tk.Button(frame, text="End Quiz", command=lambda: end_quiz(win)).pack(pady=5)
 
 # --- Drag and Drop Logic ---
 
@@ -408,7 +408,7 @@ def ask_drag_and_drop(question_data, question_number):
         show_result(win, result)
 
     tk.Button(frame, text="Submit", command=submit).pack(pady=10)
-    tk.Button(frame, text="End Quiz", command=end_quiz).pack(pady=5)
+    tk.Button(frame, text="End Quiz", command=lambda: end_quiz(win)).pack(pady=5)
 
 # --- Show Result Popup ---
 
@@ -427,7 +427,7 @@ def show_result(parent, message):
 
 # --- End Quiz Logic ---
 
-def end_quiz():
+def end_quiz(parent=None):
     total_answered = current_question if current_question > 0 else 1
     score = (correct_answers / total_answered) * 100
 
@@ -446,6 +446,13 @@ def end_quiz():
     end_win = tk.Toplevel(root)
     end_win.title("Quiz Ended")
     end_win.protocol("WM_DELETE_WINDOW", close_program)
+
+    if parent is not None:
+        try:
+            parent.destroy()
+        except tk.TclError:
+            pass
+
     tk.Label(end_win, text=f"Score: {correct_answers}/{total_answered} ({score:.2f}%)").pack(pady=10)
 
     try:

@@ -12,22 +12,35 @@ from typing import List, Tuple
 from quiz_app import load_questions, start_gui, normalize_mc_answer_to_letters
 
 
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def app_path(*parts: str) -> str:
+    return os.path.join(APP_DIR, *parts)
+
+
 DEFAULT_CANDIDATES = [
     os.environ.get("SC200_JSON"),
-    "questions/sc-200.json",
-    "sc-200.json",
-    "data/sc-200.json",
+    app_path("questions", "sc-200.json"),
+    app_path("sc-200.json"),
+    app_path("data", "sc-200.json"),
 ]
 
 
 def find_default_json() -> str:
     for p in [p for p in DEFAULT_CANDIDATES if p]:
         if os.path.exists(p):
-            return p
-    # last resort: any sc-200.json in tree
-    for p in glob.glob("**/sc-200.json", recursive=True):
+            return os.path.abspath(p)
+
+    # Last resort: search only inside this CertApp folder, and prefer the
+    # questions folder over runtime data or duplicate copied app trees.
+    matches = sorted(
+        glob.glob(app_path("**", "sc-200.json"), recursive=True),
+        key=lambda p: (0 if f"{os.sep}questions{os.sep}" in p else 1, p),
+    )
+    for p in matches:
         if os.path.exists(p):
-            return p
+            return os.path.abspath(p)
     raise FileNotFoundError(
         "Could not find a questions JSON. Pass --file or set SC200_JSON."
     )
@@ -81,7 +94,7 @@ def main():
     parser.add_argument('--validate', action='store_true', help='Validate the questions JSON and exit')
     args = parser.parse_args()
 
-    path = args.file or None
+    path = os.path.abspath(args.file) if args.file else None
     if not path:
         try:
             path = find_default_json()
@@ -101,6 +114,7 @@ def main():
             sys.exit(0)
 
     # Start GUI
+    print(f"Loading questions from: {path}")
     start_gui(path, args.count, dark_mode=args.dark)
 
 
