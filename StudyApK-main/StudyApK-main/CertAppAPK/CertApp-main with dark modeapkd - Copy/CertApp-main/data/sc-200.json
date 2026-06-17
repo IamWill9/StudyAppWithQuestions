@@ -1,0 +1,41 @@
+{
+  "Topic 1": [
+    {
+      "type": "multiple_choice",
+      "question": "This is an example Question",
+      "options": [
+        "A:",
+        "B:",
+        "C:",
+        "D:"
+      ],
+      "answer": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "explanation": "Remember to include refrences to your source, you can copy them directly from the explantion box, and in the pydroid version you can touch the url, your default borwser will automatically open your default browser \n https://tinyurl.com/3wads3hh "
+    },
+    {
+      "type": "drag_and_drop",
+      "question": "in this type of question you can have images, such as the one included etc.... Complete the KQL query",
+      "options": [
+        "| where Operation in (({{Operations}}))",
+        "| where Operation in ({{Operations}})",
+        "| where (\"{{Operations}}\"==\"AH\" or {{Operations}})",
+        "| where \"{{Operations:lable}}\" == \"AH\" or Operation in (({{Operations}}))",
+        "| project Site_Url",
+        "| where Operation != \"",
+        "| where SiteUrl != \"",
+        "| where SiteUrl =~ \""
+      ],
+      "answer": [
+        "| where Operation in ({{Operations}})",
+        "| project Site_Url"
+      ],
+      "explanation": "- **`| where Operation in ({{Operations}})`**: This safely uses a dynamic parameter in a way that avoids Python or templating conflicts. It allows KQL to match a list of values provided at runtime.\n\n- **`| project Site_Url`**: Filters the output to only include site URLs, inherently excluding null or empty values.\n\nEscaping the curly braces ensures compatibility with template engines and editors without altering the query logic.\n\nReference: https://learn.microsoft.com/en-us/azure/sentinel/visualize-data#use-parameters-in-kql-queries",
+      "image": "Images/hotspot131.png"
+    }
+  ]
+}
