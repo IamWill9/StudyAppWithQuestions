@@ -51,3 +51,14 @@ def test_drag_and_drop_respects_pipes():
         "| summarize count() by AccountName",
     ]
     assert selected == expected  # guard: we compare exact strings without splitting
+
+
+def test_load_score_history_tolerates_empty_or_invalid_file(tmp_path, monkeypatch):
+    history_file = tmp_path / "score_history.json"
+    monkeypatch.setattr(qa, "SCORE_HISTORY_FILE", str(history_file))
+
+    history_file.write_text("", encoding="utf-8")
+    assert qa.load_score_history() == []
+
+    history_file.write_text("{}", encoding="utf-8")
+    assert qa.load_score_history() == []

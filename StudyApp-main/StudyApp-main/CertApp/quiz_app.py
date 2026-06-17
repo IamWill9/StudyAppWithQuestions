@@ -33,69 +33,45 @@ def load_questions(file_path):
         return json.load(f)
 
 # --- Persistent Memory for Asked Questions ---
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(APP_DIR, "data")
-
-
-def runtime_data_file(filename):
-    return os.path.join(DATA_DIR, filename)
-
-
-def legacy_runtime_file(filename):
-    return os.path.join(APP_DIR, filename)
-
-
-def read_runtime_json(filename):
-    data_path = runtime_data_file(filename)
-    legacy_path = legacy_runtime_file(filename)
-    path = data_path if os.path.exists(data_path) else legacy_path
-
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
-
-def write_runtime_json(filename, data):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(runtime_data_file(filename), "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def remove_runtime_json(filename):
-    for path in (runtime_data_file(filename), legacy_runtime_file(filename)):
-        if os.path.exists(path):
-            os.remove(path)
-
-
 QUESTION_MEMORY_FILE = "asked_questions.json"
 WRONG_QUESTIONS_FILE = "wrong_questions.json"
 
 
 def load_asked_questions():
-    return read_runtime_json(QUESTION_MEMORY_FILE)
+    if os.path.exists(QUESTION_MEMORY_FILE):
+        with open(QUESTION_MEMORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
 
 
 def save_asked_questions(questions):
-    write_runtime_json(QUESTION_MEMORY_FILE, questions)
+    with open(QUESTION_MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(questions, f, ensure_ascii=False, indent=2)
 
 
 def reset_question_memory():
-    remove_runtime_json(QUESTION_MEMORY_FILE)
+    if os.path.exists(QUESTION_MEMORY_FILE):
+        os.remove(QUESTION_MEMORY_FILE)
 
 
 def load_wrong_questions():
-    return read_runtime_json(WRONG_QUESTIONS_FILE)
+    if os.path.exists(WRONG_QUESTIONS_FILE):
+        with open(WRONG_QUESTIONS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
 
 
 def save_wrong_questions(questions):
-    write_runtime_json(WRONG_QUESTIONS_FILE, questions)
+    with open(WRONG_QUESTIONS_FILE, "w", encoding="utf-8") as f:
+        json.dump(questions, f, ensure_ascii=False, indent=2)
 
 
 def reset_wrong_questions():
-    remove_runtime_json(WRONG_QUESTIONS_FILE)
+    if os.path.exists(WRONG_QUESTIONS_FILE):
+        os.remove(WRONG_QUESTIONS_FILE)
 
 # --- Global Quiz State ---
+root = None
 questions_asked = []
 correct_answers = 0
 question_queue: List[dict] = []
@@ -107,11 +83,19 @@ SCORE_HISTORY_FILE = "score_history.json"
 
 
 def load_score_history():
-    return read_runtime_json(SCORE_HISTORY_FILE)
+    if os.path.exists(SCORE_HISTORY_FILE):
+        try:
+            with open(SCORE_HISTORY_FILE, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return []
+        return history if isinstance(history, list) else []
+    return []
 
 
 def save_score_history(history):
-    write_runtime_json(SCORE_HISTORY_FILE, history)
+    with open(SCORE_HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
 
 
 def record_score(score, correct, total):
@@ -145,11 +129,26 @@ def close_program():
     global root
     if root is not None:
         try:
+            for child in root.winfo_children():
+                if isinstance(child, tk.Toplevel):
+                    child.destroy()
             root.quit()     # Exit the main loop cleanly
             root.destroy()  # Destroy the root window safely
         except tk.TclError:
             pass
         root = None
+
+
+def close_quiz_windows():
+    """Close any open question/result windows before showing the final screen."""
+    if root is None:
+        return
+    for child in root.winfo_children():
+        if isinstance(child, tk.Toplevel):
+            try:
+                child.destroy()
+            except tk.TclError:
+                pass
 
 
 def create_scrollable_window(title):
@@ -214,17 +213,15 @@ def normalize_mc_answer_to_letters(options: List[str], answer: Iterable) -> Set[
         if not s:
             continue
 
-        # Case 1: exact option text matches.
-        # This must run before letter parsing so option text like "Disable Y"
-        # is not mistaken for answer letter D.
-        if s in option_to_letter:
-            letters.add(option_to_letter[s])
+        # Case 1: starts with a letter (A/B/...) possibly followed by '.' or ':'
+        first = s[0].upper()
+        if first in letter_to_index:
+            letters.add(first)
             continue
 
-        # Case 2: a bare letter, or a letter followed by punctuation.
-        first = s[0].upper()
-        if first in letter_to_index and (len(s) == 1 or s[1] in ".:"):
-            letters.add(first)
+        # Case 2: exact option text matches
+        if s in option_to_letter:
+            letters.add(option_to_letter[s])
             continue
 
         # Case 3: token like "A:" or "A." separated by whitespace
@@ -342,7 +339,7 @@ def ask_multiple_choice(question_data, question_number):
         show_result(win, result)
 
     tk.Button(frame, text="Submit", command=submit).pack(pady=10)
-    tk.Button(frame, text="End Quiz", command=lambda: end_quiz(win)).pack(pady=5)
+    tk.Button(frame, text="End Quiz", command=end_quiz).pack(pady=5)
 
 # --- Drag and Drop Logic ---
 
@@ -408,7 +405,7 @@ def ask_drag_and_drop(question_data, question_number):
         show_result(win, result)
 
     tk.Button(frame, text="Submit", command=submit).pack(pady=10)
-    tk.Button(frame, text="End Quiz", command=lambda: end_quiz(win)).pack(pady=5)
+    tk.Button(frame, text="End Quiz", command=end_quiz).pack(pady=5)
 
 # --- Show Result Popup ---
 
@@ -427,7 +424,7 @@ def show_result(parent, message):
 
 # --- End Quiz Logic ---
 
-def end_quiz(parent=None):
+def end_quiz():
     total_answered = current_question if current_question > 0 else 1
     score = (correct_answers / total_answered) * 100
 
@@ -443,17 +440,9 @@ def end_quiz(parent=None):
     # Determine which image to show
     image_file = result_images["pass"] if score >= 79 else result_images["fail"]
 
-    end_win = tk.Toplevel(root)
-    end_win.title("Quiz Ended")
-    end_win.protocol("WM_DELETE_WINDOW", close_program)
-
-    if parent is not None:
-        try:
-            parent.destroy()
-        except tk.TclError:
-            pass
-
-    tk.Label(end_win, text=f"Score: {correct_answers}/{total_answered} ({score:.2f}%)").pack(pady=10)
+    close_quiz_windows()
+    end_win, frame = create_scrollable_window("Quiz Ended")
+    tk.Label(frame, text=f"Score: {correct_answers}/{total_answered} ({score:.2f}%)").pack(pady=10)
 
     try:
         base_dir = os.path.dirname(__file__)
@@ -465,25 +454,29 @@ def end_quiz(parent=None):
         ax.axis('off')
         fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, master=end_win)
+        canvas = FigureCanvasTkAgg(fig, master=frame)
         canvas.draw()
         canvas.get_tk_widget().pack(pady=10)
 
     except Exception as e:
         print(f"Failed to show result image: {e}")
-        tk.Label(end_win, text=f"(Could not load image: {image_file})", fg="red").pack(pady=5)
+        tk.Label(frame, text=f"(Could not load image: {image_file})", fg="red").pack(pady=5)
 
     # show score history
     history = load_score_history()
     if history:
-        tk.Label(end_win, text="Score History:").pack(pady=5)
-        lines = [f"{h['date']}: {h['correct']}/{h['total']} ({h['score']:.2f}%)" for h in history]
-        text = tk.Text(end_win, wrap="word", height=min(10, len(lines)+1), borderwidth=0, relief="flat", bg=end_win.cget("bg"))
+        tk.Label(frame, text="Score History:").pack(pady=5)
+        lines = [
+            f"{h.get('date', 'Unknown date')}: {h.get('correct', 0)}/{h.get('total', 0)} ({h.get('score', 0):.2f}%)"
+            for h in history
+            if isinstance(h, dict)
+        ]
+        text = tk.Text(frame, wrap="word", height=min(10, len(lines)+1), borderwidth=0, relief="flat", bg=frame.cget("bg"))
         text.insert("1.0", "\n".join(lines))
         text.config(state="disabled")
         text.pack(padx=10, pady=5, fill="both", expand=True)
 
-    tk.Button(end_win, text="Close", command=close_program).pack(pady=10)
+    tk.Button(frame, text="Close", command=close_program).pack(pady=10)
 
 
 # --- Next Question ---
