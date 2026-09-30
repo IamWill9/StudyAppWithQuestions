@@ -1,6 +1,6 @@
-# CertApp (SC‑200 Quiz)
+# CertApp (SC-200 and SC-300)
 
-A Tkinter-based quiz app to practice for **Microsoft SC‑200** (Security Operations Analyst). It supports multiple‑choice and drag‑and‑drop questions, shows images, remembers what you’ve mastered, and keeps score history.
+A Tkinter-based quiz app to practice for **Microsoft SC-200** and **SC-300**. Choose an exam at startup; progress is kept separately. See [exam instructions and SC-300 source notes](EXAMS.md). It supports multiple‑choice and drag‑and‑drop questions, shows images, remembers what you’ve mastered, and keeps score history.
 
 > ✅ This repository ships with a **test JSON question bank** (e.g., `sc-200.json`). The app’s parser accepts letters (A/B/…), letter+punctuation (e.g., `"A:"`), or full option texts.
 
@@ -39,9 +39,9 @@ pip install -r requirements.txt
 
 ```bash
 # Validate your questions JSON
-python main.py --validate --file sc-200.json
+python main.py --validate --file questions/sc-200.json
 
-# Run the app (auto-detects JSON if not passed)
+# Run the app and choose an exam
 python main.py --count 10 --dark
 ```
 

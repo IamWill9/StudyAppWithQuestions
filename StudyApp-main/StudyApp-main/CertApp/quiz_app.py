@@ -12,7 +12,11 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import font as tkfont
 
-from PIL import Image
+from PIL import Image, ImageTk
+from pathlib import Path
+import hashlib
+import webbrowser
+from tkinter import ttk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from datetime import datetime
@@ -32,6 +36,75 @@ __all__ = [
 def load_questions(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+APP_DIR = Path(__file__).resolve().parent
+
+
+def discover_exams():
+    """Find shipped exam banks independently of the working directory."""
+    return {p.stem.upper(): str(p) for p in sorted((APP_DIR / "questions").glob("*.json"))}
+
+
+def configure_exam_storage(question_file):
+    """Keep each exam's mastered questions, missed questions and scores separate."""
+    global QUESTION_MEMORY_FILE, WRONG_QUESTIONS_FILE, SCORE_HISTORY_FILE
+    path = Path(question_file).resolve()
+    shipped = APP_DIR / "questions"
+    key = path.stem.lower()
+    if path.parent != shipped:
+        key += "-" + hashlib.sha256(str(path).encode()).hexdigest()[:12]
+    folder = APP_DIR / "data" / key
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, variable in [("asked_questions.json", "QUESTION_MEMORY_FILE"),
+                           ("wrong_questions.json", "WRONG_QUESTIONS_FILE"),
+                           ("score_history.json", "SCORE_HISTORY_FILE")]:
+        target = folder / name
+        # Import legacy SC-200 history once, keeping the original intact.
+        if key == "sc-200" and not target.exists():
+            for legacy in [Path.cwd() / name, APP_DIR / name]:
+                if legacy.is_file():
+                    target.write_bytes(legacy.read_bytes())
+                    break
+        globals()[variable] = str(target)
+
+
+def question_slots(question):
+    return question.get("slots") or [
+        {"label": f"Box {i + 1}", "options": question["options"]}
+        for i in range(len(question["answer"]))
+    ]
+
+
+def show_images(frame, paths):
+    """Keep source figures readable and offer their full resolution on click."""
+    for relative in paths:
+        full_path = APP_DIR / relative
+        try:
+            with Image.open(full_path) as original:
+                picture = original.convert("RGB")
+            picture.thumbnail((1000, 800), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(picture, master=frame)
+            label = tk.Label(frame, image=photo, cursor="hand2")
+            label.image = photo
+            label.pack(padx=12, pady=8, anchor="w")
+            label.bind("<Button-1>", lambda event, p=full_path: webbrowser.open(p.as_uri()))
+        except (OSError, ValueError) as error:
+            tk.Label(frame, text=f"Could not load {relative}: {error}").pack()
+
+
+def show_question_content(frame, question, number):
+    tk.Label(frame, text=f"Question {number}", font=("Arial", 18, "bold")).pack(pady=5)
+    source = question.get("source")
+    if source:
+        tk.Label(frame, text=f"{source['document']} · Question {source['question_number']} · Pages " +
+                 ", ".join(map(str, source['pages']))).pack(pady=4)
+    tk.Label(frame, text=question['question'], wraplength=1000, justify="left",
+             font=("Arial", 16)).pack(padx=12, pady=10, anchor="w")
+    paths = question.get("images", [])
+    if question.get("image"):
+        paths = [question['image']] + paths
+    show_images(frame, paths)
+
 
 # --- Persistent Memory for Asked Questions ---
 QUESTION_MEMORY_FILE = "asked_questions.json"
@@ -289,23 +362,7 @@ def ask_multiple_choice(question_data, question_number):
 
     win, frame = create_scrollable_window(f"Question {question_number}")
 
-    if image_path:
-        try:
-            base_dir = os.path.dirname(__file__)
-            full_path = os.path.join(base_dir, image_path)
-            img = Image.open(full_path)
-            fig, ax = plt.subplots(figsize=(8, 6))
-            ax.imshow(img)
-            ax.axis('off')
-            fig.tight_layout()
-            canvas = FigureCanvasTkAgg(fig, master=frame)
-            canvas.draw()
-            canvas.get_tk_widget().pack(pady=10)
-        except Exception as e:
-            print(f"Failed to show image: {e}")
-
-    tk.Label(frame, text=f"Question {question_number}", font=("Arial", 18, "bold")).pack(pady=5)
-    tk.Label(frame, text=question, wraplength=800, font=("Arial", 16)).pack(pady=10)
+    show_question_content(frame, question_data, question_number)
 
     user_vars = []
     for i, opt in enumerate(options):
@@ -328,6 +385,10 @@ def ask_multiple_choice(question_data, question_number):
             if question_data not in wrong_qs:
                 wrong_qs.append(question_data)
                 save_wrong_questions(wrong_qs)
+        win.question_data = question_data
+        for child in frame.winfo_children():
+            if isinstance(child, tk.Button):
+                child.configure(state="disabled")
         show_result(win, result)
 
     tk.Button(frame, text="Submit", command=submit).pack(pady=10)
@@ -346,30 +407,14 @@ def ask_drag_and_drop(question_data, question_number):
 
     win, frame = create_scrollable_window(f"Question {question_number}")
 
-    image_path = question_data.get('image')
-    if image_path:
-        try:
-            base_dir = os.path.dirname(__file__)
-            full_path = os.path.join(base_dir, image_path)
-            img = Image.open(full_path)
-            fig, ax = plt.subplots(figsize=(8, 6))
-            ax.imshow(img)
-            ax.axis('off')
-            fig.tight_layout()
-            canvas = FigureCanvasTkAgg(fig, master=frame)
-            canvas.draw()
-            canvas.get_tk_widget().pack(pady=10)
-        except Exception as e:
-            print(f"Failed to show image: {e}")
-
-    tk.Label(frame, text=f"Question {question_number}", font=("Arial", 18, "bold")).pack(pady=5)
-    tk.Label(frame, text=question, wraplength=800, font=("Arial", 16)).pack(pady=10)
+    show_question_content(frame, question_data, question_number)
 
     selected_vars = []
-    for _ in (correct if isinstance(correct, (list, tuple)) else [correct]):
+    for slot in question_slots(question_data):
+        tk.Label(frame, text=slot["label"]).pack(anchor="w", padx=12)
         var = tk.StringVar()
         var.set("Select option")
-        dropdown = tk.OptionMenu(frame, var, *options)
+        dropdown = tk.OptionMenu(frame, var, *slot["options"])
         dropdown.pack(pady=2)
         selected_vars.append(var)
 
@@ -394,6 +439,10 @@ def ask_drag_and_drop(question_data, question_number):
             if question_data not in wrong_qs:
                 wrong_qs.append(question_data)
                 save_wrong_questions(wrong_qs)
+        win.question_data = question_data
+        for child in frame.winfo_children():
+            if isinstance(child, tk.Button):
+                child.configure(state="disabled")
         show_result(win, result)
 
     tk.Button(frame, text="Submit", command=submit).pack(pady=10)
@@ -403,16 +452,18 @@ def ask_drag_and_drop(question_data, question_number):
 
 def show_result(parent, message):
     global current_question
-    result_win = tk.Toplevel(root)
-    result_win.title("Result")
-    result_win.protocol("WM_DELETE_WINDOW", close_program)
-
-    result_text = tk.Text(result_win, wrap="word", height=10, borderwidth=0, relief="flat", bg=result_win.cget("bg"))
-    result_text.insert("1.0", message)
-    result_text.config(state="disabled", cursor="arrow")
-    result_text.pack(padx=20, pady=10, fill="both", expand=True)
-
-    tk.Button(result_win, text="OK", command=lambda: (result_win.destroy(), parent.destroy(), next_question())).pack(pady=5)
+    result_win, frame = create_scrollable_window("Result")
+    tk.Label(frame, text=message, wraplength=1000, justify="left").pack(padx=20, pady=10)
+    question = getattr(parent, "question_data", {})
+    if question.get("source"):
+        tk.Label(frame, text="Answer and solution from the supplied PDF").pack(pady=5)
+    show_images(frame, question.get("answer_images", []))
+    for url in question.get("references", []):
+        if url.startswith(("https://", "http://")):
+            link = tk.Label(frame, text=url, fg="#5599ff", cursor="hand2", wraplength=1000)
+            link.pack(padx=20, pady=3, anchor="w")
+            link.bind("<Button-1>", lambda event, u=url: webbrowser.open(u))
+    tk.Button(frame, text="Next question", command=lambda: (result_win.destroy(), parent.destroy(), next_question())).pack(pady=10)
 
 # --- End Quiz Logic ---
 
@@ -468,6 +519,7 @@ def end_quiz():
         text.config(state="disabled")
         text.pack(padx=10, pady=5, fill="both", expand=True)
 
+    tk.Button(frame, text="Choose another exam", command=close_quiz_windows).pack(pady=10)
     tk.Button(frame, text="Close", command=close_program).pack(pady=10)
 
 
@@ -525,10 +577,10 @@ def apply_dark_mode(root):
     )
 
 
-def start_gui(question_file, default_count=5, dark_mode=False):
+def start_gui(question_file=None, default_count=5, dark_mode=False):
     global root, question_count_var
     root = tk.Tk()
-    root.title("SC-200 Quiz App")
+    root.title("Certification Practice")
     root.geometry("600x400")
     root.attributes("-fullscreen", False)
     root.resizable(True, True)
@@ -540,17 +592,47 @@ def start_gui(question_file, default_count=5, dark_mode=False):
     default_font = tkfont.nametofont("TkDefaultFont")
     default_font.configure(size=14)
     root.option_add("*Font", default_font)
-    tk.Label(root, text="How many questions would you like to answer?").pack(pady=10)
-    question_count_var = tk.StringVar(value=str(default_count))
-    tk.Entry(root, textvariable=question_count_var).pack(pady=5)
-
-    def start_quiz_from_input():
-        try:
-            count = int(question_count_var.get())
-            topics = load_questions(question_file)
-            run_quiz(count, topics)
-        except ValueError:
-            messagebox.showerror("Invalid input", "Please enter a valid number.")
-
-    tk.Button(root, text="Start Quiz", command=start_quiz_from_input).pack(pady=20)
+    build_exam_picker(root, question_file, default_count)
     root.mainloop()
+
+
+def build_exam_picker(parent, question_file=None, default_count=5):
+    exams = discover_exams()
+    if question_file:
+        path = str(Path(question_file).resolve())
+        selected = next((name for name, file in exams.items() if file == path), "Custom exam")
+        exams[selected] = path
+    else:
+        selected = next(iter(exams), "")
+    tk.Label(parent, text="Choose your exam").pack(pady=(20, 5))
+    exam_var = tk.StringVar(parent, value=selected)
+    picker = ttk.Combobox(parent, textvariable=exam_var, values=list(exams), state="readonly")
+    picker.pack(pady=5)
+    details = tk.StringVar(parent)
+    def update_details(*_):
+        try:
+            count = sum(len(qs) for qs in load_questions(exams[exam_var.get()]).values())
+            details.set(f"{count} questions · Progress saved separately for this exam")
+        except (OSError, ValueError, KeyError):
+            details.set("Unable to load this exam")
+    exam_var.trace_add("write", update_details)
+    update_details()
+    tk.Label(parent, textvariable=details).pack(pady=5)
+    tk.Label(parent, text="How many questions would you like to answer?").pack(pady=10)
+    count_var = tk.StringVar(parent, value=str(default_count))
+    tk.Entry(parent, textvariable=count_var).pack(pady=5)
+    def start():
+        try:
+            count = int(count_var.get())
+            if count < 1:
+                raise ValueError("Enter a number greater than zero.")
+            path = exams[exam_var.get()]
+            topics = load_questions(path)
+            configure_exam_storage(path)
+        except (ValueError, KeyError, OSError) as error:
+            messagebox.showerror("Cannot start quiz", str(error))
+            return
+        close_quiz_windows()
+        run_quiz(count, topics)
+    tk.Button(parent, text="Start Quiz", command=start).pack(pady=20)
+    return exam_var, count_var
