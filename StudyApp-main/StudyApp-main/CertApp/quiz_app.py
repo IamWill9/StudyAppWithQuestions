@@ -519,6 +519,7 @@ def apply_dark_mode(root):
         foreground="#ffffff",
         activeBackground="#555555",
         activeForeground="#ffffff",
+        selectColor="#2e2e2e",
         highlightColor="#888888",
         highlightBackground="#555555",
     )

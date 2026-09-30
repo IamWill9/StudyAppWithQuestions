@@ -119,3 +119,51 @@ def test_validator_reports_missing_image(tmp_path):
     total, issues = validate_questions(str(bank))
     assert total == 1
     assert any("missing image" in issue for issue in issues)
+
+
+@pytest.fixture(scope="module")
+def tk_root():
+    try:
+        root = qa.tk.Tk()
+    except qa.tk.TclError as exc:
+        pytest.skip(f"Tk display unavailable: {exc}")
+    root.geometry("600x400+10000+10000")
+    yield root
+    root.destroy()
+
+
+@pytest.mark.parametrize("dark", [False, True])
+def test_checkbox_stays_selected_after_mouse_release(dark, monkeypatch, tk_root):
+    root = tk_root
+    monkeypatch.setattr(qa, "root", root)
+    frame = qa.tk.Frame(root)
+    frame.pack(fill="both", expand=True)
+    monkeypatch.setattr(qa, "create_scrollable_window", lambda title: (root, frame))
+    try:
+        if dark:
+            qa.apply_dark_mode(root)
+        qa.ask_multiple_choice({"question": "Choose two", "options": ["One", "Two"],
+                                "answer": ["A", "B"]}, 1)
+        root.update()
+        boxes = [w for w in frame.winfo_children() if isinstance(w, qa.tk.Checkbutton)]
+        for box in boxes:
+            # A tick must remain visible against the indicator's background.
+            assert root.winfo_rgb(box.cget("foreground")) != root.winfo_rgb(box.cget("selectcolor"))
+            for x, expected in [(5, 1), (40, 0), (40, 1)]:
+                box.event_generate("<Enter>")
+                box.event_generate("<ButtonPress-1>", x=x, y=10)
+                box.event_generate("<ButtonRelease-1>", x=x, y=10)
+                box.event_generate("<Leave>")
+                root.update()
+                assert int(root.getvar(box.cget("variable"))) == expected
+        # Both independently selected options must reach the submit callback.
+        results = []
+        monkeypatch.setattr(qa, "show_result", lambda parent, message: results.append(message))
+        monkeypatch.setattr(qa, "mark_question_correct", lambda question: None)
+        monkeypatch.setattr(qa, "correct_answers", 0)
+        next(w for w in frame.winfo_children() if isinstance(w, qa.tk.Button)
+             and w.cget("text") == "Submit").invoke()
+        assert results[0].startswith("Correct!")
+        assert qa.correct_answers == 1
+    finally:
+        frame.destroy()
