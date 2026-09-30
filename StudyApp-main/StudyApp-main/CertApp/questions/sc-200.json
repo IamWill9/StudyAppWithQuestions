@@ -2244,7 +2244,7 @@
         "A trigger"
       ],
       "explanation": "To meet the Azure Sentinel requirements, you should use a **Scheduled** analytics rule, which allows you to define custom queries and create rules that run on a defined interval. To automatically initiate a playbook, you must define **a trigger**, which integrates the rule with an automation workflow (Logic App).\n\nReferences:\n- https://docs.microsoft.com/en-us/azure/sentinel/tutorial-detect-threats-custom#set-automated-responses-and-create-the-rule\n- https://docs.microsoft.com/en-us/azure/sentinel/tutorial-respond-threats-playbook",
-      "image": "Images/hotspot148.png"
+      "image": "Images/hotspot148.jpg"
     },
     {
       "type": "drag_and_drop",
@@ -2262,7 +2262,7 @@
         "Add a data connector"
       ],
       "explanation": "- **Add a security extension**: This enables Microsoft Defender for Cloud Apps (MCAS) to integrate with Azure Sentinel via API/SIEM agent.\n- **Add a data connector**: This step is essential to ingest data from MCAS into Azure Sentinel. The MCAS activity logs are routed via the data connector.\n\nReferences:\n- https://docs.microsoft.com/en-us/defender-cloud-apps/siem-sentinel\n- https://docs.microsoft.com/en-us/cloud-app-security/siem-sentinel\n- https://learn.microsoft.com/en-us/azure/sentinel/data-connectors-reference#microsoft-defender-for-cloud-apps\n- https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/microsoft-cloud-app-security-mcas-activity-log-in-azure-sentinel/ba-p/1849806",
-      "image": "Images/hotspot147.png"
+      "image": "Images/hotspot147.jpg"
     },
     {
       "type": "drag_and_drop",
@@ -2299,7 +2299,7 @@
         "workspace"
       ],
       "explanation": "- To query across **multiple Azure Sentinel workspaces or tenants**, you use the `workspace()` function in KQL.\n- The number `1` indicates querying **1 external workspace** in addition to the default.\n- This setup helps meet the requirement of correlating data between Contoso and Fabrikam tenants.\n\nReference: https://docs.microsoft.com/en-us/azure/sentinel/extend-sentinel-across-workspaces-tenants#cross-workspace-workbooks",
-      "image": "Images/hotspot145.png"
+      "image": "Images/hotspot145.jpg"
     },
     {
       "type": "drag_and_drop",
@@ -2317,7 +2317,7 @@
         "count()"
       ],
       "explanation": "- **DeviceFileEvents** is the appropriate table to use in Microsoft Defender for Endpoint's Advanced Hunting when investigating file-related activity such as access, download, or deletion.\n- **count()** is used to calculate how many times the specified activity occurred. This satisfies the requirement to find files with more than five activities.\n\nReference: https://docs.microsoft.com/en-us/microsoft-365/security/defender/advanced-hunting-devicefileevents-table?view=o365-worldwide",
-      "image": "hotspot144.png"
+      "image": "Images/hotspot144.png"
     },
     {
       "type": "drag_and_drop",
@@ -4013,7 +4013,7 @@
         "2"
       ],
       "explanation": "Correct query filters logons and counts failures.",
-      "image": "images/cfo1.png"
+      "image": "Images/cfo1.png"
     },
     {
       "type": "drag_and_drop",
@@ -4270,7 +4270,7 @@
         "IdentityLogonEvents"
       ],
       "explanation": "The query requires two sources:\n\n1. **IdentityInfo** – This table contains user-related metadata such as department, job title, and account status. It is necessary for filtering users specifically in the finance department.\n\n2. **IdentityLogonEvents** – This table contains all identity-based sign-in data and is required to filter for interactive authentication attempts.\n\nCombining these two datasets allows analysts to filter authentication logs down to users in a specific organizational unit or department, such as finance.\n\nReference: https://learn.microsoft.com/en-us/microsoft-365/security/defender/advanced-hunting-identitylogonevents-table?view=o365-worldwide",
-      "image": "Images/hotspon8.png"
+      "image": "Images/hotspot8.png"
     },
     {
       "type": "drag_and_drop",
@@ -5359,7 +5359,7 @@
         "Resource Id"
       ],
       "explanation": "To suppress alerts in Microsoft Defender for Cloud (formerly Azure Security Center) for a specific resource like an Azure Storage account, you create a suppression rule.\n\n- The **entity type** should be **Azure Resource** because you're targeting a specific Azure service.\n- The **field** should be **Resource Id**, which uniquely identifies the Azure Storage account within the subscription.\n\nReference: https://learn.microsoft.com/en-us/azure/defender-for-cloud/alerts-suppression-rules",
-      "image": "Images/hotspot18.png"
+      "image": "Images/hotspot18.jpg"
     },
     {
       "type": "drag_and_drop",
@@ -5378,7 +5378,7 @@
         "Select Azure Resource as the entity type and specify the Resource ID."
       ],
       "explanation": "To automatically suppress specific types of alerts for a known source in Azure Security Center (now Microsoft Defender for Cloud):\n\n1. **Select Security alerts** – You start by navigating to existing alerts to identify the noisy alert type.\n2. **Select Suppression rules, and then select Create new suppression rule** – You initiate the creation of a rule to hide future instances of this alert.\n3. **Select Azure Resource as the entity type and specify the Resource ID** – Since the alerts are coming from a known Azure Functions app, you use the resource's unique identifier to target it specifically.\n\nReference: https://learn.microsoft.com/en-us/azure/defender-for-cloud/alerts-suppression-rules",
-      "image": "Images/hotspot19.png"
+      "image": "Images/hotspot19.jpg"
     },
     {
       "type": "drag_and_drop",
@@ -5730,7 +5730,7 @@
         "1 alert",
         "1 alert"
       ],
-      "image": "Images/hotspot41.png",
+      "image": "Images/hotspot41.jpg",
       "explanation": "Each custom analytics rule without incident grouping or suppression logic will generate a separate alert for each detection.\nBased on the exhibit, two separate analytics rules each generate one alert independently.\n\nReference: https://learn.microsoft.com/en-us/azure/sentinel/tutorial-detect-threats-custom"
     },
     {
@@ -5800,7 +5800,7 @@
         "Server1",
         "CEF1"
       ],
-      "image": "Images/hotspot35.jpg",
+      "image": "Images/hotspot35.png",
       "explanation": "To prevent duplicate logs in Azure Sentinel when using CEF forwarders:\n- Ensure that CEF logs are sent to a central forwarder (CEF1) from Server1.\n- The forwarder (CEF1) sends unique logs to the Sentinel workspace (SW1), avoiding direct duplicates.\n\nThis configuration ensures deduplication at the forwarder layer before ingestion.\n\nReference:https://learn.microsoft.com/en-us/azure/sentinel/cef-syslog-ama-overview?tabs=single"
     },
     {

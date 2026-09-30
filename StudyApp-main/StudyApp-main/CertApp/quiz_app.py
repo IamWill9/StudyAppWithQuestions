@@ -7,6 +7,7 @@
 import os
 import json
 import random
+import re
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import font as tkfont
@@ -211,24 +212,21 @@ def normalize_mc_answer_to_letters(options: List[str], answer: Iterable) -> Set[
     for raw in items:
         s = str(raw).strip()
         if not s:
-            continue
+            return set()
 
-        # Case 1: starts with a letter (A/B/...) possibly followed by '.' or ':'
-        first = s[0].upper()
-        if first in letter_to_index:
-            letters.add(first)
-            continue
-
-        # Case 2: exact option text matches
+        # Full option text takes precedence over its initial letter.
         if s in option_to_letter:
             letters.add(option_to_letter[s])
             continue
 
-        # Case 3: token like "A:" or "A." separated by whitespace
-        token = s.split()[0].rstrip(".:").upper()
-        if token in letter_to_index:
-            letters.add(token)
+        # Only explicit answer labels count as letters, never arbitrary words.
+        match = re.fullmatch(r"([A-Za-z])(?:[.:](?:\s+.*)?)?", s)
+        if match and match.group(1).upper() in letter_to_index:
+            letters.add(match.group(1).upper())
             continue
+
+        # Do not silently accept part of a malformed multi-answer key.
+        return set()
 
     return letters
 
@@ -256,14 +254,8 @@ def is_mc_selection_correct(options: List[str], correct, selected_letters: Set[s
     if correct_letters:
         return selected_letters == correct_letters, format_correct_answer(options, correct_letters)
 
-    # Fallback: compare by option texts (if "answer" is stored as texts)
-    selected_texts = {options[ord(L) - 65] for L in selected_letters}
-    correct_set = set(correct) if isinstance(correct, (list, tuple, set)) else {correct}
-    is_correct = selected_texts == correct_set
-
-    tmp_letters = normalize_mc_answer_to_letters(options, list(correct_set))
-    correct_display = format_correct_answer(options, tmp_letters) if tmp_letters else ", ".join(correct_set)
-    return is_correct, correct_display
+    # Invalid or empty answer keys must never award credit.
+    return False, "Invalid answer key"
 
 
 # --- Ask a Question Dispatcher ---

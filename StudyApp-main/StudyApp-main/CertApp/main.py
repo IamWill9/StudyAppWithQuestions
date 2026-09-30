@@ -7,6 +7,7 @@ import argparse
 import glob
 import os
 import sys
+from pathlib import Path
 from typing import List, Tuple
 
 from quiz_app import load_questions, start_gui, normalize_mc_answer_to_letters
@@ -51,6 +52,12 @@ def validate_questions(path: str) -> Tuple[int, List[str]]:
             opts = q.get("options")
             ans = q.get("answer")
             qtype = q.get("type", "multiple_choice")
+
+            image = q.get("image")
+            if image:
+                image_path = Path(__file__).resolve().parent / image
+                if not image_path.is_file():
+                    issues.append(f"{topic}[{idx}] missing image: {image}")
 
             if not qtext or not isinstance(qtext, str):
                 issues.append(f"{topic}[{idx}] missing/invalid 'question'")
