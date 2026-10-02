@@ -167,3 +167,124 @@ def test_checkbox_stays_selected_after_mouse_release(dark, monkeypatch, tk_root)
         assert qa.correct_answers == 1
     finally:
         frame.destroy()
+
+
+def test_sc300_complete_bank_and_assets():
+    from main import validate_questions
+    bank = qa.APP_DIR / 'questions/sc-300.json'
+    total, issues = validate_questions(str(bank))
+    assert (total, issues) == (408, [])
+    questions = qa.load_questions(bank)['SC-300']
+    assert {q['source']['question_number'] for q in questions} == set(range(1, 409))
+    assert len({q['id'] for q in questions}) == 408
+    assert sum(bool(q.get('adapted_simulation')) for q in questions) == 19
+    assert sum(bool(q.get('source_context_missing')) for q in questions) == 9
+    images = set()
+    for q in questions:
+        assert q['explanation']
+        assert 'See Explanation section for answer' not in str(q['options'])
+        assert not set(q['images']) & set(q['answer_images'])
+        images.update(q['images'] + q['answer_images'])
+        for url in q['references']:
+            assert url.startswith(('http://', 'https://'))
+            assert not any(c.isspace() for c in url)
+        if q['type'] == 'multiple_choice':
+            correct = qa.normalize_mc_answer_to_letters(q['options'], q['answer'])
+            assert qa.is_mc_selection_correct(q['options'], q['answer'], correct)[0]
+            assert not qa.is_mc_selection_correct(q['options'], q['answer'], set())[0]
+        else:
+            assert len(q['slots']) == len(q['answer'])
+            assert all(a in s['options'] for a, s in zip(q['answer'], q['slots']))
+    assert len(images) == 472
+    for path in images:
+        with qa.Image.open(qa.APP_DIR / path) as image:
+            image.verify()
+
+
+def test_exam_storage_isolation_and_legacy_migration(tmp_path, monkeypatch):
+    monkeypatch.setattr(qa, 'APP_DIR', tmp_path)
+    monkeypatch.chdir(tmp_path)
+    for name in ['QUESTION_MEMORY_FILE','WRONG_QUESTIONS_FILE','SCORE_HISTORY_FILE']:
+        monkeypatch.setattr(qa, name, getattr(qa, name))
+    (tmp_path / 'asked_questions.json').write_text('["legacy"]')
+    qa.configure_exam_storage(tmp_path / 'questions/sc-200.json')
+    assert qa.load_asked_questions() == ['legacy']
+    qa.save_wrong_questions(['sc200 missed'])
+    qa.record_score(100, 1, 1)
+    qa.configure_exam_storage(tmp_path / 'questions/sc-300.json')
+    assert qa.load_asked_questions() == []
+    assert qa.load_wrong_questions() == []
+    assert qa.load_score_history() == []
+    qa.save_asked_questions(['sc300 mastered'])
+    qa.configure_exam_storage(tmp_path / 'questions/sc-200.json')
+    assert qa.load_asked_questions() == ['legacy']
+    assert qa.load_wrong_questions() == ['sc200 missed']
+    assert qa.load_score_history()[0]['score'] == 100
+    assert (tmp_path / 'asked_questions.json').read_text() == '["legacy"]'
+
+
+def test_exam_picker_starts_selected_bank(tk_root, monkeypatch):
+    frame = qa.tk.Frame(tk_root)
+    frame.pack()
+    calls = []
+    monkeypatch.setattr(qa, 'configure_exam_storage', lambda path: calls.append(path))
+    monkeypatch.setattr(qa, 'close_quiz_windows', lambda: None)
+    monkeypatch.setattr(qa, 'run_quiz', lambda count, topics: calls.append((count, sum(map(len, topics.values())))))
+    try:
+        exam, count = qa.build_exam_picker(frame)
+        start = next(w for w in frame.winfo_children() if isinstance(w, qa.tk.Button))
+        for name, expected in [('SC-300',408),('SC-200',375)]:
+            exam.set(name)
+            count.set('7')
+            start.invoke()
+            assert calls[-1] == (7, expected)
+            assert calls[-2].endswith(name.lower()+'.json')
+    finally:
+        frame.destroy()
+
+
+@pytest.mark.parametrize('number', [5, 20, 87, 156, 327, 374, 393])
+def test_sc300_interactive_submission(number, monkeypatch, tk_root):
+    question = qa.load_questions(qa.APP_DIR / 'questions/sc-300.json')['SC-300'][number-1]
+    frame = qa.tk.Frame(tk_root)
+    frame.pack()
+    monkeypatch.setattr(qa, 'create_scrollable_window', lambda title: (tk_root, frame))
+    monkeypatch.setattr(qa, 'show_images', lambda frame, paths: None)
+    monkeypatch.setattr(qa, 'mark_question_correct', lambda q: None)
+    results = []
+    monkeypatch.setattr(qa, 'show_result', lambda parent, message: results.append(message))
+    monkeypatch.setattr(qa, 'correct_answers', 0)
+    try:
+        if question['type'] == 'multiple_choice':
+            qa.ask_multiple_choice(question, 1)
+            boxes = [w for w in frame.winfo_children() if isinstance(w, qa.tk.Checkbutton)]
+            for letter in qa.normalize_mc_answer_to_letters(question['options'],question['answer']):
+                boxes[ord(letter)-65].invoke()
+        else:
+            qa.ask_drag_and_drop(question, 1)
+            menus = [w for w in frame.winfo_children() if isinstance(w, qa.tk.OptionMenu)]
+            assert len(menus) == len(question['answer'])
+            for menu, answer, slot in zip(menus, question['answer'], question['slots']):
+                menu['menu'].invoke(slot['options'].index(answer))
+        submit = next(w for w in frame.winfo_children() if isinstance(w, qa.tk.Button) and w.cget('text') == 'Submit')
+        submit.invoke()
+        submit.invoke()
+        assert len(results) == 1
+        assert results[0].startswith('Correct!')
+        assert qa.correct_answers == 1
+    finally:
+        frame.destroy()
+
+
+def test_source_images_render_in_tk(tk_root):
+    frame = qa.tk.Frame(tk_root)
+    frame.pack()
+    try:
+        qa.show_images(frame, ['Images/sc-300/p003-15.jpeg', 'Images/sc-300/p375-07.png'])
+        tk_root.update_idletasks()
+        labels = frame.winfo_children()
+        assert len(labels) == 2
+        assert all(label.cget('image') for label in labels)
+        assert all(label.bind('<Button-1>') for label in labels)
+    finally:
+        frame.destroy()
