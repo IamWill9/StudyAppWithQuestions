@@ -233,7 +233,7 @@ def test_exam_picker_starts_selected_bank(tk_root, monkeypatch):
     try:
         exam, count = qa.build_exam_picker(frame)
         start = next(w for w in frame.winfo_children() if isinstance(w, qa.tk.Button))
-        for name, expected in [('SC-300',408),('SC-200',375)]:
+        for name, expected in [('SC-300',408),('SC-200',375),('SC-500',120)]:
             exam.set(name)
             count.set('7')
             start.invoke()
@@ -288,3 +288,88 @@ def test_source_images_render_in_tk(tk_root):
         assert all(label.bind('<Button-1>') for label in labels)
     finally:
         frame.destroy()
+
+
+def test_sc500_bank_and_source_assets():
+    from main import validate_questions
+    bank = qa.APP_DIR / 'questions/sc-500.json'
+    assert validate_questions(str(bank)) == (120, [])
+    topics = qa.load_questions(bank)
+    assert [len(qs) for qs in topics.values()] == [36, 36, 24, 24]
+    questions = [q for qs in topics.values() for q in qs]
+    assert [q['source']['question_number'] for q in questions] == list(range(1, 121))
+    assert len({q['id'] for q in questions}) == 120
+    assert sum(q['type'] == 'drag_and_drop' for q in questions) == 36
+    assert sum('context_pages' in q['source'] for q in questions) == 17
+    assert 'Fabrikam' in questions[72]['question']
+    assert 'Fabrikam' in questions[96]['question']
+    assert 'Contoso' in questions[73]['question']
+    assert questions[95]['answer'] == ['E']
+    assert questions[95]['source_answer_conflict'] is True
+    images = set()
+    for q in questions:
+        assert q['explanation'] and q['source']['pages']
+        assert 'See Explanation section' not in str(q['options'])
+        assert not set(q['images']) & set(q['answer_images'])
+        images.update(q['images'] + q['answer_images'])
+        for url in q['references']:
+            assert url.startswith(('http://', 'https://'))
+            assert not any(c.isspace() for c in url)
+            assert 'Overview' not in url and 'Testlet' not in url
+        if q['type'] == 'multiple_choice':
+            letters = qa.normalize_mc_answer_to_letters(q['options'], q['answer'])
+            assert qa.is_mc_selection_correct(q['options'], q['answer'], letters)[0]
+            assert not qa.is_mc_selection_correct(q['options'], q['answer'], set())[0]
+    assert len(images) == 114
+    for image in images:
+        with qa.Image.open(qa.APP_DIR / image) as asset:
+            asset.verify()
+
+
+@pytest.mark.parametrize('question', [q for qs in qa.load_questions(qa.APP_DIR / 'questions/sc-500.json').values()
+                                    for q in qs if q['type'] == 'drag_and_drop'], ids=lambda q: q['id'])
+def test_sc500_interactive_scoring(question, monkeypatch, tk_root):
+    monkeypatch.setattr(qa, 'show_images', lambda frame, paths: None)
+    monkeypatch.setattr(qa, 'mark_question_correct', lambda q: None)
+    monkeypatch.setattr(qa, 'load_wrong_questions', lambda: [])
+    wrong = []
+    monkeypatch.setattr(qa, 'save_wrong_questions', lambda questions: wrong.extend(questions))
+    for choose_correct in (True, False):
+        frame = qa.tk.Frame(tk_root)
+        frame.pack()
+        results = []
+        monkeypatch.setattr(qa, 'create_scrollable_window', lambda title: (tk_root, frame))
+        monkeypatch.setattr(qa, 'show_result', lambda parent, message: results.append(message))
+        monkeypatch.setattr(qa, 'correct_answers', 0)
+        try:
+            qa.ask_drag_and_drop(question, 1)
+            menus = [w for w in frame.winfo_children() if isinstance(w, qa.tk.OptionMenu)]
+            assert len(menus) == len(question['answer'])
+            for i, (menu, answer, slot) in enumerate(zip(menus, question['answer'], question['slots'])):
+                index = slot['options'].index(answer)
+                if not choose_correct and i == 0:
+                    index = (index + 1) % len(slot['options'])
+                menu['menu'].invoke(index)
+            submit = next(w for w in frame.winfo_children() if isinstance(w, qa.tk.Button) and w.cget('text') == 'Submit')
+            submit.invoke()
+            assert results[0].startswith('Correct!' if choose_correct else 'Wrong!')
+            assert qa.correct_answers == int(choose_correct)
+        finally:
+            frame.destroy()
+    assert wrong == [question]
+
+
+def test_sc500_progress_is_separate_from_existing_exams(tmp_path, monkeypatch):
+    monkeypatch.setattr(qa, 'APP_DIR', tmp_path)
+    for variable in ['QUESTION_MEMORY_FILE', 'WRONG_QUESTIONS_FILE', 'SCORE_HISTORY_FILE']:
+        monkeypatch.setattr(qa, variable, getattr(qa, variable))
+    for exam in ['sc-200', 'sc-300', 'sc-500']:
+        qa.configure_exam_storage(tmp_path / 'questions' / (exam+'.json'))
+        qa.save_asked_questions([exam])
+        qa.save_wrong_questions([exam+'-missed'])
+        qa.save_score_history([{'exam':exam}])
+    for exam in ['sc-200', 'sc-300', 'sc-500']:
+        qa.configure_exam_storage(tmp_path / 'questions' / (exam+'.json'))
+        assert qa.load_asked_questions() == [exam]
+        assert qa.load_wrong_questions() == [exam+'-missed']
+        assert qa.load_score_history() == [{'exam':exam}]
