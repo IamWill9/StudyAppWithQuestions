@@ -1,6 +1,6 @@
-# CertApp (SC-200 and SC-300)
+# CertApp (SC-200, SC-300 and SC-500)
 
-A Tkinter-based quiz app to practice for **Microsoft SC-200** and **SC-300**. Choose an exam at startup; progress is kept separately. See [exam instructions and SC-300 source notes](EXAMS.md). It supports multiple‑choice and drag‑and‑drop questions, shows images, remembers what you’ve mastered, and keeps score history.
+A Tkinter-based quiz app to practice for **Microsoft SC-200**, **SC-300** and **SC-500**. Choose an exam at startup; progress is kept separately. See [exam instructions and source notes](EXAMS.md). It supports multiple‑choice and drag‑and‑drop questions, shows images, remembers what you’ve mastered, and keeps score history.
 
 > ✅ This repository ships with a **test JSON question bank** (e.g., `sc-200.json`). The app’s parser accepts letters (A/B/…), letter+punctuation (e.g., `"A:"`), or full option texts.
 

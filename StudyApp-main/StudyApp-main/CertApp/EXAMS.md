@@ -1,4 +1,4 @@
-# Exam selection and SC-300
+# Exam selection
 
 Launch the desktop application from this folder:
 
@@ -7,9 +7,9 @@ python main.py
 python main.py --dark
 ```
 
-Choose SC-200 (375 questions) or SC-300 (408 questions), enter a question count, and select **Start Quiz**. **Choose another exam** on the results screen returns to the picker.
+Choose SC-200 (375 questions), SC-300 (408 questions), or SC-500 (120 questions), enter a question count, and select **Start Quiz**. **Choose another exam** on the results screen returns to the picker.
 
-Progress, missed questions and score history are stored separately in `data/sc-200` and `data/sc-300`. Existing SC-200 progress is copied on first use; the original files are retained. Custom banks supplied with `--file` receive their own storage directory.
+Progress, missed questions and score history are stored separately in `data/sc-200`, `data/sc-300`, and `data/sc-500`. Existing SC-200 progress is copied on first use; the original files are retained. Custom banks supplied with `--file` receive their own storage directory.
 
 Image questions use numbered menus matching the order of the source boxes or statements. Choices can be reused, including repeated Yes/No answers. All boxes must match to score the question. Click an image to open it at full resolution. Source solution images and clickable references appear after submission.
 
@@ -36,3 +36,9 @@ python -m pytest tests -q
 Tests cover both bank counts, image decoding, every answer key, exam selection, progress isolation, legacy migration, checkbox mouse release in light/dark modes, interactive answer submission and duplicate-submit prevention.
 
 This change is for the desktop application. The separate Android project has its own question data and UI.
+
+## SC-500
+
+SC-500 includes 120 questions across four topics, including 36 image-based questions with ordered menus. Shared case-study text and tables are included with 17 questions. See [SC-500 source notes](SC500.md), including the printed answer/explanation conflict in question 96.
+
+Validate with `python main.py --validate --file questions/sc-500.json`.
